@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Authenticity Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0a0f;
+    --surface:  #111118;
+    --border:   #1e1e2e;
+    --accent:   #00e5ff;
+    --danger:   #ff4d6d;
+    --safe:     #00e676;
+    --muted:    #444466;
+    --text:     #e0e0f0;
+    --subtext:  #8888aa;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 80px;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; width: 100%; max-width: 760px; }
+
+  /* Header */
+  header { text-align: center; margin-bottom: 48px; }
+  .badge {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 14px;
+    margin-bottom: 20px;
+    opacity: 0.8;
+  }
+  h1 {
+    font-size: clamp(2rem, 6vw, 3.4rem);
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--subtext);
+    letter-spacing: 1px;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--muted);
+    border-radius: 4px;
+    padding: 56px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(0,229,255,.04);
+  }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon {
+    width: 52px; height: 52px; margin: 0 auto 16px;
+    opacity: .5;
+  }
+  .upload-zone p {
+    font-size: 15px; color: var(--subtext); margin-bottom: 8px;
+  }
+  .upload-zone span {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* Button */
+  .btn {
+    display: block; width: 100%; margin-top: 16px;
+    padding: 14px 32px;
+    background: var(--accent);
+    color: #000;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border: none; border-radius: 2px;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+  }
+  .btn:hover  { opacity: .85; }
+  .btn:active { transform: scale(.98); }
+  .btn:disabled { opacity: .3; cursor: not-allowed; }
+
+  /* Result card */
+  #result-card {
+    margin-top: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    display: none;
+    animation: fadeUp .35s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(16px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .result-thumb {
+    width: 90px; height: 90px;
+    object-fit: cover;
+    border-radius: 2px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+  .result-verdict { flex: 1; }
+  .verdict-label {
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--subtext);
+    margin-bottom: 6px;
+  }
+  .verdict-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .verdict-value.real { color: var(--safe); }
+  .verdict-value.fake { color: var(--danger); }
+  .verdict-conf {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--subtext);
+    margin-top: 4px;
+  }
+
+  /* Probability bars */
+  .prob-section { padding: 20px 24px; }
+  .prob-row { margin-bottom: 14px; }
+  .prob-row:last-child { margin-bottom: 0; }
+  .prob-meta {
+    display: flex; justify-content: space-between;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--subtext);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .prob-bar-bg {
+    background: var(--border); border-radius: 2px; height: 6px; overflow: hidden;
+  }
+  .prob-bar-fill {
+    height: 100%; border-radius: 2px;
+    transition: width .6s cubic-bezier(.4,0,.2,1);
+    width: 0%;
+  }
+  .bar-real { background: var(--safe); }
+  .bar-fake { background: var(--danger); }
+
+  /* Model info */
+  .model-info {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex; gap: 24px; flex-wrap: wrap;
+  }
+  .info-item {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .info-item strong { color: var(--subtext); display: block; margin-bottom: 2px; }
+
+  /* Spinner */
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid rgba(0,229,255,.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: inline-block; vertical-align: middle; margin-right: 8px;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .error-box {
+    margin-top: 16px;
+    padding: 14px 18px;
+    background: rgba(255,77,109,.08);
+    border: 1px solid rgba(255,77,109,.3);
+    border-radius: 2px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--danger);
+    display: none;
+  }
+
+  footer {
+    margin-top: 56px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="badge">ResNet-50 · Wang et al. 2020</div>
+    <h1>Image <span>Authenticity</span><br>Detector</h1>
+    <p class="subtitle">Detects CNN-generated images · ProGAN · 20-class trained</p>
+  </header>
+
+  <div class="upload-zone" id="dropzone">
+    <input type="file" id="file-input" accept="image/*">
+    <svg class="upload-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1" y="1" width="50" height="50" rx="3" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <path d="M26 34V18M26 18L20 24M26 18L32 24" stroke="#00e5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M16 38H36" stroke="#00e5ff" stroke-width="1.5" stroke-linecap="round" opacity=".4"/>
+    </svg>
+    <p>Drop an image here or click to browse</p>
+    <span>JPG · PNG · WEBP · BMP</span>
+  </div>
+
+  <div class="error-box" id="error-box"></div>
+
+  <button class="btn" id="analyse-btn" disabled>
+    Analyse Image
+  </button>
+
+  <div id="result-card">
+    <div class="result-header">
+      <img class="result-thumb" id="result-thumb" src="" alt="preview">
+      <div class="result-verdict">
+        <div class="verdict-label">Verdict</div>
+        <div class="verdict-value" id="verdict-value">—</div>
+        <div class="verdict-conf" id="verdict-conf">—</div>
+      </div>
+    </div>
+    <div class="prob-section">
+      <div class="prob-row">
+        <div class="prob-meta">
+          <span>Real photograph</span>
+          <span id="real-pct">—</span>
+        </div>
+        <div class="prob-bar-bg">
+          <div class="prob-bar-fill bar-real" id="real-bar"></div>
+        </div>
+      </div>
+      <div class="prob-row">
+        <div class="prob-meta">
+          <span>AI-Generated</span>
+          <span id="fake-pct">—</span>
+        </div>
+        <div class="prob-bar-bg">
+          <div class="prob-bar-fill bar-fake" id="fake-bar"></div>
+        </div>
+      </div>
+    </div>
+    <div class="model-info">
+      <div class="info-item"><strong>Model</strong>ResNet-50</div>
+      <div class="info-item"><strong>Augmentation</strong>Blur + JPEG</div>
+      <div class="info-item"><strong>Input size</strong>224 × 224</div>
+      <div class="info-item"><strong>Test AP</strong>{{ model_meta.get('test_ap', 'n/a') if model_meta else 'n/a' }}</div>
+    </div>
+  </div>
+
+  <footer>CSE 429 · Computer Vision · E-JUST Spring 2026</footer>
+
+</div>
+
+<script>
+const fileInput   = document.getElementById('file-input');
+const dropzone    = document.getElementById('dropzone');
+const analyseBtn  = document.getElementById('analyse-btn');
+const resultCard  = document.getElementById('result-card');
+const errorBox    = document.getElementById('error-box');
+let selectedFile  = null;
+
+// Drag & drop
+dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) setFile(f);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) setFile(fileInput.files[0]);
+});
+
+function setFile(f) {
+  selectedFile = f;
+  analyseBtn.disabled = false;
+  errorBox.style.display = 'none';
+  resultCard.style.display = 'none';
+  dropzone.querySelector('p').textContent = f.name;
+}
+
+analyseBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  analyseBtn.disabled = true;
+  analyseBtn.innerHTML = '<span class="spinner"></span>Analysing…';
+  errorBox.style.display = 'none';
+  resultCard.style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('image', selectedFile);
+
+  try {
+    const res  = await fetch('/predict', { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    // Populate result card
+    document.getElementById('result-thumb').src  = data.thumbnail;
+    const verdictEl = document.getElementById('verdict-value');
+    verdictEl.textContent = data.label;
+    verdictEl.className   = 'verdict-value ' + (data.label === 'Real' ? 'real' : 'fake');
+    document.getElementById('verdict-conf').textContent = `Confidence: ${data.confidence}%`;
+
+    document.getElementById('real-pct').textContent = data.prob_real + '%';
+    document.getElementById('fake-pct').textContent = data.prob_fake + '%';
+
+    // Animate bars after a tick so CSS transition fires
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.getElementById('real-bar').style.width = data.prob_real + '%';
+      document.getElementById('fake-bar').style.width = data.prob_fake + '%';
+    }));
+
+    resultCard.style.display = 'block';
+  } catch (e) {
+    errorBox.textContent    = '⚠ ' + e.message;
+    errorBox.style.display  = 'block';
+  } finally {
+    analyseBtn.disabled = false;
+    analyseBtn.innerHTML = 'Analyse Image';
+  }
+});
+</script>
+</body>
+</html>
