@@ -38,7 +38,7 @@ fake-CNN-image-detection/
 
 The model is trained to distinguish **real photographs** from **CNN-generated (GAN) images**. Below are examples of synthetic vs. real image pairs across different generator architectures — only ProGAN was seen during training.
 
-![Synthetic vs real examples across GAN architectures](images/generator_examples.png)
+![Synthetic vs real examples across GAN architectures](https://marawan-mogeb.github.io/fake-CNN-image-detection/images/generator_examples.png)
 
 ---
 
@@ -162,7 +162,7 @@ MODEL_PATH=/data/models/my_checkpoint.pth python app.py
 
 The model was trained **only on ProGAN** data, then evaluated on 12 unseen generator architectures to test generalization. Results below are from our reproduction:
 
-![Cross-Generator Generalization — AP per generator](images/our_results.png)
+![Cross-Generator Generalization — AP per generator](https://marawan-mogeb.github.io/fake-CNN-image-detection/images/our_results.png)
 
 | Generator | AP (%) | Notes |
 |---|---|---|
